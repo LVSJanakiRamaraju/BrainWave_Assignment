@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { Role, AuditLog, UserWithRoles, Permission, Profile } from "@/types";
 import {
-  Shield, Users, KeyRound, ScrollText, LogOut, Building2, Plus, X,
+  Shield, Users, KeyRound, ScrollText, LogOut, Building2, X,
   Search, Loader2, AlertCircle, Check, UserCog, Lock, Unlock, ChevronRight,
 } from "lucide-react";
 
@@ -72,7 +72,7 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
     const targetIds = [...new Set((data || []).map((l: AuditLog) => l.target_id).filter(Boolean))] as string[];
     const allIds = [...new Set([...actorIds, ...targetIds])];
 
-    let profileMap = new Map<string, Profile>();
+    const profileMap = new Map<string, Profile>();
     if (allIds.length > 0) {
       const { data: profileData } = await supabase
         .from("profiles")
@@ -380,7 +380,7 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {roles.map((role) => {
                 const userCount = users.filter((u) => u.roles.some((r) => r.id === role.id)).length;
-                const rolePermissions = permissions.filter((p) => {
+                const rolePermissions = permissions.filter(() => {
                   // We'd need role_permissions data to show this accurately
                   return true;
                 });
@@ -433,12 +433,12 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {permissions.map((perm) => (
-                    <tr key={perm.id} className="hover:bg-slate-50 transition-colors">
+                  {permissions.map((permission) => (
+                    <tr key={permission.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
-                        <code className="text-sm font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{perm.name}</code>
+                        <code className="text-sm font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{permission.name}</code>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">{perm.description}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{permission.description}</td>
                     </tr>
                   ))}
                 </tbody>

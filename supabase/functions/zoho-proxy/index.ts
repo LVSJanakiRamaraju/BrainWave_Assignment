@@ -6,18 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface UserRoleRow {
-  role_name: string;
-}
-
-interface ZohoAppRow {
-  name: string;
-  url: string;
-  category: string;
-  icon: string;
-  description: string;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -155,7 +143,6 @@ Deno.serve(async (req: Request) => {
       }
 
       // Try to get a Zoho access token if credentials are configured
-      let zohoAccessToken: string | null = null;
       let zohoConnected = false;
 
       const clientId = Deno.env.get("ZOHO_CLIENT_ID");
@@ -178,7 +165,7 @@ Deno.serve(async (req: Request) => {
 
           if (tokenResponse.ok) {
             const tokenData = await tokenResponse.json();
-            zohoAccessToken = tokenData.access_token || null;
+            zohoConnected = Boolean(tokenData.access_token);
           }
         } catch {
           // Token refresh failed — still return the app URL for direct access
@@ -196,7 +183,6 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           app_name: (app as { name: string }).name,
           url: (app as { url: string }).url,
-          access_token: zohoAccessToken,
           zoho_connected: zohoConnected,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

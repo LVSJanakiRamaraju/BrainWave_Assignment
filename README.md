@@ -57,6 +57,9 @@ A web-based employee portal with built-in authentication, Role-Based Access Cont
 # Install dependencies
 npm install
 
+# Configure Supabase (copy the example and fill in your project values)
+copy .env.example .env
+
 # Start the dev server
 npm run dev
 
@@ -66,6 +69,8 @@ npm run build
 # Type check
 npm run typecheck
 ```
+
+The local `.env` file is ignored by Git. Never commit service-role keys, Zoho client secrets, or refresh tokens.
 
 ## Zoho OAuth Configuration
 
@@ -78,6 +83,16 @@ To connect the Zoho API integration:
    - `ZOHO_CLIENT_ID`
    - `ZOHO_CLIENT_SECRET`
    - `ZOHO_REFRESH_TOKEN`
+
+From the project directory, link the Supabase project and set the secrets without committing them:
+
+```bash
+supabase link --project-ref ssuvwhbyytpwdbyfonhy
+supabase secrets set ZOHO_CLIENT_ID="your-client-id" ZOHO_CLIENT_SECRET="your-client-secret" ZOHO_REFRESH_TOKEN="your-refresh-token"
+supabase functions deploy zoho-proxy
+```
+
+The Zoho client secret and refresh token must remain in Supabase Edge Function secrets. They must never be added to `VITE_*` variables or sent to the browser.
 
 The backend edge function (`zoho-proxy`) uses these credentials to automatically refresh access tokens server-side. Employees never see or enter Zoho credentials.
 
