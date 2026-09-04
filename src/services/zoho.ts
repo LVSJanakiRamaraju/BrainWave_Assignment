@@ -1,7 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import type { ZohoAppResponse } from "@/types";
 
-const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-proxy`;
+const FUNCTIONS_BASE_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
+  || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+const FUNCTION_URL = `${FUNCTIONS_BASE_URL}/zoho-proxy`;
 
 async function getAuthToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();

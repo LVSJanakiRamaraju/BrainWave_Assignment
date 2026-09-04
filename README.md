@@ -78,6 +78,8 @@ To run the Zoho Edge Function locally with the same values, use the Supabase CLI
 supabase functions serve zoho-proxy --env-file .env
 ```
 
+Keep `VITE_SUPABASE_FUNCTIONS_URL=http://127.0.0.1:54321/functions/v1` in local `.env` while running that command. For production, remove that variable or set it to `https://ssuvwhbyytpwdbyfonhy.supabase.co/functions/v1`, then deploy the function with the Zoho secrets configured in Supabase.
+
 ## Zoho OAuth Configuration
 
 To connect the Zoho API integration:
