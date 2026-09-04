@@ -98,6 +98,8 @@ supabase secrets set ZOHO_CLIENT_ID="your-client-id" ZOHO_CLIENT_SECRET="your-cl
 supabase functions deploy zoho-proxy
 ```
 
+After deploying the migrations, create accounts with the department matching their role (`HR`, `Sales`, `Support`, or `Finance`). The database automatically assigns that non-Admin role. Assign `Admin` explicitly from the database or an existing administrator account.
+
 The Zoho client secret and refresh token must remain in Supabase Edge Function secrets in production. They must never be added to `VITE_*` variables or sent to the browser. `VITE_*` values are bundled into the public frontend; `Deno.env.get("ZOHO_*")` is evaluated only inside the Edge Function.
 
 The backend edge function (`zoho-proxy`) uses these credentials to automatically refresh access tokens server-side. Employees never see or enter Zoho credentials.
