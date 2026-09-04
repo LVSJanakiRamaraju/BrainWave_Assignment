@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { api, clearToken, hasToken, saveToken, type PortalUser } from "@/lib/api";
 import type { Profile, Role } from "@/types";
 
 interface AuthContextValue {
-  session: Session | null;
-  user: User | null;
+  session: { access_token: string } | null;
+  user: PortalUser | null;
   profile: Profile | null;
   roles: Role[];
   loading: boolean;
@@ -19,111 +18,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<{ access_token: string } | null>(null);
+  const [user, setUser] = useState<PortalUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchUserData = async (userId: string, userEmail: string) => {
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-
-    const profileWithEmail: Profile | null = profileData
-      ? { ...profileData, email: userEmail }
-      : null;
-    setProfile(profileWithEmail);
-
-    const { data: userRolesData } = await supabase
-      .from("user_roles")
-      .select("roles(id, name, description, created_at)")
-      .eq("user_id", userId);
-
-    const userRoles: Role[] = (userRolesData as unknown as { roles: Role }[] | null)
-      ?.map((r) => r.roles)
-      .filter(Boolean) || [];
-    setRoles(userRoles);
-  };
+  const applyAuth = (data: Awaited<ReturnType<typeof api.login>>) => { saveToken(data.token); setSession({ access_token: data.token }); setUser(data.user); setProfile(data.profile); setRoles(data.roles); };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id, session.user.email ?? "").finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        (async () => {
-          await fetchUserData(session.user.id, session.user.email ?? "");
-          setLoading(false);
-        })();
-      } else {
-        setProfile(null);
-        setRoles([]);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    if (!hasToken()) { setLoading(false); return; }
+    api.me().then((data) => { setUser(data.user); setProfile(data.profile); setRoles(data.roles); setSession({ access_token: localStorage.getItem("brainwave_token")! }); }).catch(clearToken).finally(() => setLoading(false));
   }, []);
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string, department: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName, department } },
-    });
-    if (error) return { error: error.message };
-    if (data.user) {
-      await supabase.from("audit_logs").insert({
-        action: "user.signed_up",
-        actor_id: data.user.id,
-        details: { email, full_name: fullName, department },
-      });
-    }
-    return { error: null };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setRoles([]);
-  };
-
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchUserData(user.id, user.email ?? "");
-    }
-  };
-
-  const isAdmin = roles.some((r) => r.name === "Admin");
-
-  return (
-    <AuthContext.Provider
-      value={{ session, user, profile, roles, loading, isAdmin, signIn, signUp, signOut, refreshProfile }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const signIn = async (email: string, password: string) => { try { applyAuth(await api.login(email, password)); return { error: null }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to sign in" }; } };
+  const signUp = async (email: string, password: string, fullName: string, department: string) => { try { await api.signup(email, password, fullName, department); return { error: null }; } catch (error) { return { error: error instanceof Error ? error.message : "Unable to create account" }; } };
+  const signOut = async () => { clearToken(); setSession(null); setUser(null); setProfile(null); setRoles([]); };
+  const refreshProfile = async () => { const data = await api.me(); setUser(data.user); setProfile(data.profile); setRoles(data.roles); };
+  const isAdmin = roles.some((role) => role.name === "Admin");
+  return <AuthContext.Provider value={{ session, user, profile, roles, loading, isAdmin, signIn, signUp, signOut, refreshProfile }}>{children}</AuthContext.Provider>;
 }
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-}
+export function useAuth() { const context = useContext(AuthContext); if (!context) throw new Error("useAuth must be used within AuthProvider"); return context; }

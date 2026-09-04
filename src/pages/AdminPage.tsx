@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
-import type { Role, AuditLog, UserWithRoles, Permission, Profile } from "@/types";
+import { api } from "@/lib/api";
+import type { Role, AuditLog, UserWithRoles, Permission } from "@/types";
 import {
   Shield, Users, KeyRound, ScrollText, LogOut, Building2, X,
   Search, Loader2, AlertCircle, Check, UserCog, Lock, Unlock, ChevronRight,
@@ -26,70 +26,23 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
   const [assigning, setAssigning] = useState(false);
 
   const loadRoles = useCallback(async () => {
-    const { data } = await supabase.from("roles").select("*").order("name");
-    setRoles(data || []);
+    const data = await api.admin();
+    setRoles(data.roles);
   }, []);
 
   const loadPermissions = useCallback(async () => {
-    const { data } = await supabase.from("permissions").select("*").order("name");
-    setPermissions(data || []);
+    const data = await api.admin();
+    setPermissions(data.permissions);
   }, []);
 
   const loadUsers = useCallback(async () => {
-    const { data: profiles } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
-    if (!profiles) return;
-
-    const { data: userRoles } = await supabase
-      .from("user_roles")
-      .select("user_id, roles(id, name, description, created_at)");
-
-    const roleMap = new Map<string, Role[]>();
-    (userRoles as unknown as { user_id: string; roles: Role }[] | null)?.forEach((ur) => {
-      if (!roleMap.has(ur.user_id)) roleMap.set(ur.user_id, []);
-      roleMap.get(ur.user_id)!.push(ur.roles);
-    });
-
-    const usersWithRoles: UserWithRoles[] = profiles.map((p: Record<string, unknown>) => ({
-      ...p,
-      email: (p as { email?: string }).email ?? "",
-      roles: roleMap.get((p as { id: string }).id) || [],
-    })) as UserWithRoles[];
-
-    // Fetch emails from auth via the admin API is not available client-side,
-    // so we use a workaround: the profiles don't have email. We'll show name + department.
-    setUsers(usersWithRoles);
+    const data = await api.admin();
+    setUsers(data.users);
   }, []);
 
   const loadAuditLogs = useCallback(async () => {
-    const { data } = await supabase
-      .from("audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    // Fetch actor/target profiles
-    const actorIds = [...new Set((data || []).map((l: AuditLog) => l.actor_id).filter(Boolean))] as string[];
-    const targetIds = [...new Set((data || []).map((l: AuditLog) => l.target_id).filter(Boolean))] as string[];
-    const allIds = [...new Set([...actorIds, ...targetIds])];
-
-    const profileMap = new Map<string, Profile>();
-    if (allIds.length > 0) {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", allIds);
-      (profileData || []).forEach((p: Record<string, unknown>) => {
-        profileMap.set((p as { id: string }).id, p as unknown as Profile);
-      });
-    }
-
-    const logsWithProfiles: AuditLog[] = (data || []).map((log: AuditLog) => ({
-      ...log,
-      actor_profile: log.actor_id ? profileMap.get(log.actor_id) || null : null,
-      target_profile: log.target_id ? profileMap.get(log.target_id) || null : null,
-    }));
-
-    setAuditLogs(logsWithProfiles);
+    const data = await api.admin();
+    setAuditLogs(data.auditLogs);
   }, []);
 
   useEffect(() => {
@@ -110,34 +63,9 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
       const existing = assignModal.user.roles.find((r) => r.id === selectedRoleId);
       if (existing) {
         // Remove the role (toggle off)
-        const { error: delError } = await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", assignModal.user.id)
-          .eq("role_id", selectedRoleId);
-
-        if (delError) throw delError;
-        await supabase.from("audit_logs").insert({
-          action: "user.role.removed",
-          target_id: assignModal.user.id,
-          details: { role_id: selectedRoleId, role_name: roles.find((r) => r.id === selectedRoleId)?.name },
-        });
+        await api.toggleRole(assignModal.user.id, selectedRoleId);
       } else {
-        // Assign the role
-        const { error: insError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: assignModal.user.id,
-            role_id: selectedRoleId,
-            assigned_by: (await supabase.auth.getUser()).data.user?.id,
-          });
-
-        if (insError) throw insError;
-        await supabase.from("audit_logs").insert({
-          action: "user.role.assigned",
-          target_id: assignModal.user.id,
-          details: { role_id: selectedRoleId, role_name: roles.find((r) => r.id === selectedRoleId)?.name },
-        });
+        await api.toggleRole(assignModal.user.id, selectedRoleId);
       }
 
       await loadUsers();
@@ -152,22 +80,7 @@ export default function AdminPage({ onNavigate }: { onNavigate: (page: string) =
   };
 
   const handleToggleStatus = async (user: UserWithRoles) => {
-    const newStatus = user.status === "active" ? "suspended" : "active";
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ status: newStatus })
-      .eq("id", user.id);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    await supabase.from("audit_logs").insert({
-      action: newStatus === "suspended" ? "user.suspended" : "user.activated",
-      target_id: user.id,
-      details: { previous_status: user.status, new_status: newStatus },
-    });
+    try { await api.toggleStatus(user.id); } catch (err) { setError(err instanceof Error ? err.message : "Failed to update status"); return; }
 
     await loadUsers();
     await loadAuditLogs();

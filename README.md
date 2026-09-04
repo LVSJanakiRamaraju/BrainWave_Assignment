@@ -1,138 +1,74 @@
-# BrainWave Employee Portal — Custom Employee Portal with Zoho One Integration
+# BrainWave Employee Portal
 
-A web-based employee portal with built-in authentication, Role-Based Access Control (RBAC), and secure Zoho One API integration. Employees authenticate through the portal and access only the Zoho applications permitted by their assigned role — they never need individual Zoho credentials.
+A React employee portal with JWT authentication, PostgreSQL-backed RBAC, audit logging, and server-side Zoho One integration. Employees use portal credentials only; Zoho credentials remain on the API server.
+
+## Stack
+
+- Frontend: React, TypeScript, Vite, Tailwind CSS
+- Backend: Node.js, Express, JWT
+- Database: PostgreSQL, including Neon
+- Integration: Zoho OAuth v2 through the Express API
+
+## Local setup
+
+```powershell
+npm install
+cd backend
+npm install
+cd ..
+copy .env.example .env
+```
+
+Set the values in `.env`, then initialize the schema and seed roles/apps:
+
+```powershell
+node backend/server.js
+curl -Method POST http://localhost:4000/api/setup
+```
+
+Run the frontend in another terminal:
+
+```powershell
+npm run dev
+```
+
+The frontend uses `VITE_API_URL=http://localhost:4000/api`. The API reads `DATABASE_URL`, `JWT_SECRET`, and the Zoho variables server-side.
+
+## Production
+
+Deploy `backend/` to Render, Railway, Fly.io, or another Node host. Configure these API environment variables there:
+
+```env
+DATABASE_URL=your-postgresql-connection-string
+JWT_SECRET=your-long-random-secret
+ZOHO_CLIENT_ID=your-zoho-client-id
+ZOHO_CLIENT_SECRET=your-zoho-client-secret
+ZOHO_REFRESH_TOKEN=your-zoho-refresh-token
+FRONTEND_URL=https://your-frontend.example.com
+PORT=4000
+```
+
+Configure the frontend build with:
+
+```env
+VITE_API_URL=https://your-api.example.com/api
+```
+
+Run `POST /api/setup` once after deployment to create and seed the database. Do not put database, JWT, or Zoho secrets in `VITE_*` variables because Vite exposes those values to the browser.
 
 ## Features
 
-- **Custom Authentication**: Email/password login and signup via Supabase Auth
-- **Role-Based Access Control (RBAC)**: Five roles (Admin, HR, Sales, Support, Finance) with granular permissions
-- **Zoho One Integration**: Backend proxy edge function manages OAuth tokens securely; employees never touch Zoho credentials
-- **Conditional Dashboard**: Each role sees only its authorized Zoho applications
-- **Admin Panel**: Manage users, assign roles, view permissions, and inspect audit logs
-- **Audit Logging**: All administrative actions are tracked in an append-only audit trail
-- **Responsive Design**: Works seamlessly across desktop, tablet, and mobile
+- Email/password signup and login
+- Automatic department role assignment for HR, Sales, Support, and Finance
+- Admin-only user status and role management
+- Permission and audit log views
+- Role-restricted Zoho People, CRM, Desk, Books, and One Dashboard links
+- Server-side Zoho token refresh with no token returned to the browser
 
-## Tech Stack
+## Test accounts
 
-- **Frontend**: React 18 + TypeScript + Tailwind CSS + Vite
-- **Backend**: Supabase (PostgreSQL + Auth + Edge Functions)
-- **Icons**: Lucide React
-- **Zoho Integration**: Supabase Edge Function (Deno runtime) proxying Zoho OAuth v2
+Create accounts through the signup screen. Select `HR`, `Sales`, `Support`, or `Finance` as the department to receive that role. Assign `Admin` explicitly after the first account exists.
 
-## Database Schema
+## Security
 
-| Table | Purpose |
-|-------|---------|
-| `profiles` | Extends `auth.users` with employee info (name, department, status) |
-| `roles` | Five roles: Admin, HR, Sales, Support, Finance |
-| `permissions` | Granular permissions (e.g., `zoho.people.access`, `admin.users.manage`) |
-| `user_roles` | Maps users to roles (many-to-many) |
-| `role_permissions` | Maps roles to permissions (many-to-many) |
-| `zoho_applications` | Zoho app catalog linked to roles |
-| `audit_logs` | Append-only audit trail of admin actions |
-
-### Role → Zoho App Mapping
-
-| Role | Zoho Application |
-|------|-----------------|
-| Admin | Zoho One Dashboard |
-| HR | Zoho People |
-| Sales | Zoho CRM |
-| Support | Zoho Desk |
-| Finance | Zoho Books |
-
-## Test Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@brainwave.com | Admin123! |
-| HR | hr@brainwave.com | HR123! |
-| Sales | sales@brainwave.com | Sales123! |
-| Support | support@brainwave.com | Support123! |
-| Finance | finance@brainwave.com | Finance123! |
-
-## Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Configure Supabase (copy the example and fill in your project values)
-copy .env.example .env
-
-# Start the dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Type check
-npm run typecheck
-```
-
-The local `.env` file is ignored by Git. Never commit service-role keys, Zoho client secrets, or refresh tokens.
-
-To run the Zoho Edge Function locally with the same values, use the Supabase CLI from the project directory:
-
-```bash
-supabase functions serve zoho-proxy --env-file .env
-```
-
-Keep `VITE_SUPABASE_FUNCTIONS_URL=http://127.0.0.1:54321/functions/v1` in local `.env` while running that command. For production, omit `VITE_SUPABASE_FUNCTIONS_URL` so the app uses the hosted function automatically, or set it to `https://ssuvwhbyytpwdbyfonhy.supabase.co/functions/v1`.
-
-## Zoho OAuth Configuration
-
-To connect the Zoho API integration:
-
-1. Sign up for a [Zoho One free trial](https://www.zoho.com/one/)
-2. Register an application in the [Zoho API Console](https://api-console.zoho.com)
-3. Generate a `Client ID`, `Client Secret`, and `Refresh Token`
-4. Configure these as edge function secrets:
-   - `ZOHO_CLIENT_ID`
-   - `ZOHO_CLIENT_SECRET`
-   - `ZOHO_REFRESH_TOKEN`
-
-From the project directory, link the Supabase project and set the secrets without committing them:
-
-```bash
-supabase link --project-ref ssuvwhbyytpwdbyfonhy
-supabase secrets set ZOHO_CLIENT_ID="your-client-id" ZOHO_CLIENT_SECRET="your-client-secret" ZOHO_REFRESH_TOKEN="your-refresh-token"
-supabase functions deploy zoho-proxy
-```
-
-After deploying the migrations, create accounts with the department matching their role (`HR`, `Sales`, `Support`, or `Finance`). The database automatically assigns that non-Admin role. Assign `Admin` explicitly from the database or an existing administrator account.
-
-The Zoho client secret and refresh token must remain in Supabase Edge Function secrets in production. They must never be added to `VITE_*` variables or sent to the browser. `VITE_*` values are bundled into the public frontend; `Deno.env.get("ZOHO_*")` is evaluated only inside the Edge Function.
-
-The backend edge function (`zoho-proxy`) uses these credentials to automatically refresh access tokens server-side. Employees never see or enter Zoho credentials.
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────┐
-│                   Frontend                    │
-│  (React + Tailwind — Login, Dashboard, Admin) │
-└──────────────────┬───────────────────────────┘
-                   │ JWT Auth
-┌──────────────────▼───────────────────────────┐
-│              Supabase Backend                  │
-│  ┌─────────┐  ┌──────────┐  ┌──────────────┐ │
-│  │  Auth   │  │PostgreSQL│  │Edge Function │ │
-│  │(JWT)    │  │  (RLS)   │  │(Zoho Proxy)  │ │
-│  └─────────┘  └──────────┘  └──────┬───────┘ │
-└─────────────────────────────────────┼────────┘
-                                      │ OAuth v2
-                               ┌──────▼───────┐
-                               │  Zoho APIs   │
-                               └──────────────┘
-```
-
-## RBAC Implementation
-
-- **Database-level**: RLS policies on every table enforce ownership and admin checks
-- **API-level**: The Zoho proxy edge function verifies the user's JWT, fetches their roles, and only returns apps permitted by those roles
-- **UI-level**: The dashboard conditionally renders only authorized applications
-
-## License
-
-This project is built as part of the BrainWave assignment.
+The `.env` file is ignored by Git. Rotate any database, JWT, or Zoho credentials that have been shared outside your deployment secret manager.

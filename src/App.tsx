@@ -3,22 +3,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import AdminPage from "@/pages/AdminPage";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { Building2, Loader2 } from "lucide-react";
-
-function ConfigurationNotice() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white shadow-2xl">
-        <Building2 className="mx-auto mb-4 h-10 w-10 text-blue-400" />
-        <h1 className="text-2xl font-bold">BrainWave Portal</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to a local .env file, then restart the development server.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function AppContent() {
   const { user, loading, isAdmin } = useAuth();
@@ -52,10 +37,6 @@ function AppContent() {
 }
 
 export default function App() {
-  if (!isSupabaseConfigured) {
-    return <ConfigurationNotice />;
-  }
-
   return (
     <AuthProvider>
       <AppContent />
