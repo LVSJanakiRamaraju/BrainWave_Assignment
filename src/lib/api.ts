@@ -1,6 +1,6 @@
 import type { AuditLog, Permission, Profile, Role, UserWithRoles, ZohoAppResponse } from "@/types";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://brainwave-assignment-5jib.onrender.com/api";
 const TOKEN_KEY = "brainwave_token";
 
 export interface PortalUser extends Profile { email: string }
