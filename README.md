@@ -72,6 +72,12 @@ npm run typecheck
 
 The local `.env` file is ignored by Git. Never commit service-role keys, Zoho client secrets, or refresh tokens.
 
+To run the Zoho Edge Function locally with the same values, use the Supabase CLI from the project directory:
+
+```bash
+supabase functions serve zoho-proxy --env-file .env
+```
+
 ## Zoho OAuth Configuration
 
 To connect the Zoho API integration:
@@ -92,7 +98,7 @@ supabase secrets set ZOHO_CLIENT_ID="your-client-id" ZOHO_CLIENT_SECRET="your-cl
 supabase functions deploy zoho-proxy
 ```
 
-The Zoho client secret and refresh token must remain in Supabase Edge Function secrets. They must never be added to `VITE_*` variables or sent to the browser.
+The Zoho client secret and refresh token must remain in Supabase Edge Function secrets in production. They must never be added to `VITE_*` variables or sent to the browser. `VITE_*` values are bundled into the public frontend; `Deno.env.get("ZOHO_*")` is evaluated only inside the Edge Function.
 
 The backend edge function (`zoho-proxy`) uses these credentials to automatically refresh access tokens server-side. Employees never see or enter Zoho credentials.
 
